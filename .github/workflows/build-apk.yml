@@ -1,92 +1,21 @@
-
 name: Build Android APK
-
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-
-permissions:
-  contents: read
-
+on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Setup Java
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
           java-version: '17'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Extract source ZIP
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ZIP_FILE=$(find . -maxdepth 1 -type f -name '*.zip' -print -quit)
-          test -n "$ZIP_FILE"
-
-          mkdir -p source
-          unzip -q "$ZIP_FILE" -d source
-
-          PACKAGE_JSON=$(find source -type f -name package.json \
-            -not -path '*/node_modules/*' -print -quit)
-
-          test -n "$PACKAGE_JSON"
-
-          PROJECT_DIR=$(dirname "$PACKAGE_JSON")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Found project: $PROJECT_DIR"
-
-      - name: Build web assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$PROJECT_DIR"
-          npm install
-          npm run build
-          npm run android:sync
-
-      - name: Build Android APK
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cd "$PROJECT_DIR/android"
-
-          gradle --no-daemon assembleDebug
-
-          APK_PATH=$(find app/build/outputs/apk \
-            -type f -name '*.apk' -print -quit)
-
-          test -n "$APK_PATH"
-
-          mkdir -p "$GITHUB_WORKSPACE/dist-apk"
-          cp "$APK_PATH" "$GITHUB_WORKSPACE/dist-apk/app-debug.apk"
-
-          ls -lh "$GITHUB_WORKSPACE/dist-apk/"
-
+          distribution: 'temurin'
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Riftwake-Dingning-Era-APK
-          path: dist-apk/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+          name: debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
